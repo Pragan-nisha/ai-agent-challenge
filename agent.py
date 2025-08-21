@@ -16,17 +16,17 @@ import time
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class DeepSeekDebugger:
+class qwenDebugger:
     """
-    Fixed DeepSeek debugger with proper error handling and validation
+    Fixed qwen debugger with proper error handling and validation
     """
     
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.api_base = "https://openrouter.ai/api/v1/chat/completions"
         
-    def call_deepseek(self, prompt: str) -> str:
-        """Make API call to DeepSeek via OpenRouter with proper debugging and retry logic"""
+    def call_qwen(self, prompt: str) -> str:
+        """Make API call to qwen via OpenRouter with proper debugging and retry logic"""
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -42,7 +42,7 @@ class DeepSeekDebugger:
             "stream": False
         }
         
-        logger.info(f"Calling DeepSeek API with prompt length: {len(prompt)}")
+        logger.info(f"Calling qwen API with prompt length: {len(prompt)}")
         
         # Retry logic for rate limits
         max_retries = 3
@@ -81,25 +81,25 @@ class DeepSeekDebugger:
                 content = result['choices'][0]['message']['content']
                 
                 # DEBUG: Log the actual response details
-                logger.info(f"✅ DeepSeek returned {len(content)} characters")
+                logger.info(f" qwen returned {len(content)} characters")
                 logger.info(f"First 300 chars: {repr(content[:300])}")
                 logger.info(f"Last 100 chars: {repr(content[-100:])}")
                 
                 if len(content.strip()) < 50:
-                    logger.warning(f"⚠️ DeepSeek response very short: {len(content)} chars")
+                    logger.warning(f" qwen response very short: {len(content)} chars")
                     logger.warning(f"Full response: {repr(content)}")
                 
                 return content
                 
             except requests.exceptions.Timeout:
-                logger.error("DeepSeek API call timed out (120s)")
+                logger.error("qwen API call timed out (120s)")
                 if attempt < max_retries - 1:
                     logger.info(f"Retrying in {base_delay} seconds...")
                     time.sleep(base_delay)
                     continue
                 raise Exception("API call timed out")
             except requests.exceptions.RequestException as e:
-                logger.error(f"DeepSeek API request failed: {e}")
+                logger.error(f"qwen API request failed: {e}")
                 if hasattr(e, 'response') and e.response is not None:
                     logger.error(f"Response status: {e.response.status_code}")
                     logger.error(f"Response content: {e.response.text}")
@@ -119,14 +119,14 @@ class DeepSeekDebugger:
                         logger.warning(f"Rate limit detected, waiting {delay} seconds...")
                         time.sleep(delay)
                         continue
-                logger.error(f"DeepSeek API call failed: {e}")
+                logger.error(f"qwen API call failed: {e}")
                 raise
     
     def extract_and_validate_code(self, raw_response: str) -> str:
         """
         Extract Python code from response and validate it
         """
-        logger.info("🔍 Extracting code from DeepSeek response...")
+        logger.info(" Extracting code from qwen response...")
         
         original_response = raw_response
         fixed_code = raw_response.strip()
@@ -142,7 +142,7 @@ class DeepSeekDebugger:
                     fixed_code = code_section.split("```")[0]
                 else:
                     fixed_code = code_section
-                logger.info("✅ Extracted from ```python block")
+                logger.info(" Extracted from ```python block")
             else:
                 logger.warning("Found ```python but couldn't split properly")
         
@@ -153,31 +153,31 @@ class DeepSeekDebugger:
             if len(parts) >= 3:
                 # Take the first code block (parts[1])
                 fixed_code = parts[1]
-                logger.info("✅ Extracted from generic ``` block")
+                logger.info(" Extracted from generic ``` block")
             elif len(parts) == 2:
                 fixed_code = parts[1]
-                logger.info("✅ Extracted from single ``` block")
+                logger.info(" Extracted from single ``` block")
             else:
                 logger.warning("Found ``` but couldn't extract code")
         
         # Method 3: Look for class definitions (fallback)
         elif "class IntelligentPDFParser" in fixed_code:
-            logger.info("✅ Found class definition directly, using full response")
+            logger.info(" Found class definition directly, using full response")
         else:
             logger.warning("No code markers found, using full response")
         
         fixed_code = fixed_code.strip()
         
         # Validation checks
-        logger.info("🔍 Validating extracted code...")
+        logger.info(" Validating extracted code...")
         
         if not fixed_code:
-            logger.error("❌ Extracted code is empty!")
+            logger.error(" Extracted code is empty!")
             logger.error(f"Original response (first 500 chars): {repr(original_response[:500])}")
             raise Exception("Extracted code is empty")
         
         if len(fixed_code) < 200:  # Reasonable minimum for a parser class
-            logger.error(f"❌ Extracted code too short: {len(fixed_code)} characters")
+            logger.error(f" Extracted code too short: {len(fixed_code)} characters")
             logger.error(f"Extracted code: {repr(fixed_code[:200])}")
             logger.error(f"Original response (first 1000 chars): {repr(original_response[:1000])}")
             raise Exception(f"Extracted code too short: {len(fixed_code)} characters")
@@ -195,23 +195,23 @@ class DeepSeekDebugger:
                 missing_components.append(component)
         
         if missing_components:
-            logger.warning(f"⚠️ Missing components: {missing_components}")
+            logger.warning(f" Missing components: {missing_components}")
             # Don't fail here, might still work
         
         # Python syntax validation
         try:
             compile(fixed_code, '<generated_code>', 'exec')
-            logger.info("✅ Code passes syntax validation")
+            logger.info(" Code passes syntax validation")
         except SyntaxError as e:
-            logger.error(f"❌ Generated code has syntax errors: {e}")
+            logger.error(f" Generated code has syntax errors: {e}")
             logger.error(f"Error at line {e.lineno}: {e.text}")
             logger.error(f"Code around error:\n{self._get_code_context(fixed_code, e.lineno)}")
             raise Exception(f"Generated code has syntax errors: {e}")
         except Exception as e:
-            logger.error(f"❌ Code compilation failed: {e}")
+            logger.error(f" Code compilation failed: {e}")
             raise Exception(f"Code compilation failed: {e}")
         
-        logger.info(f"✅ Successfully extracted and validated {len(fixed_code)} characters of code")
+        logger.info(f" Successfully extracted and validated {len(fixed_code)} characters of code")
         return fixed_code
     
     def _get_code_context(self, code: str, error_line: int, context: int = 3) -> str:
@@ -270,17 +270,17 @@ CRITICAL REQUIREMENTS:
 IMPORTANT: Return ONLY the complete Python code. No explanations, no markdown, just the working Python script."""
 
         try:
-            logger.info("🤖 Calling DeepSeek for code debugging...")
-            raw_response = self.call_deepseek(prompt)
+            logger.info(" Calling qwen for code debugging...")
+            raw_response = self.call_qwen(prompt)
             
-            logger.info("🔧 Processing DeepSeek response...")
+            logger.info("🔧 Processing qwen response...")
             fixed_code = self.extract_and_validate_code(raw_response)
             
-            logger.info("✅ DeepSeek debugging completed successfully")
+            logger.info(" qwen debugging completed successfully")
             return fixed_code
             
         except Exception as e:
-            logger.error(f"❌ DeepSeek debugging failed: {e}")
+            logger.error(f" qwen debugging failed: {e}")
             logger.error("Returning original code as fallback")
             return code  # Return original instead of raising
 
@@ -297,8 +297,8 @@ class SimplePDFParserGenerator:
         genai.configure(api_key=gemini_api_key)
         self.model = genai.GenerativeModel('gemini-1.5-flash')
         
-        # Initialize DeepSeek debugger
-        self.debugger = DeepSeekDebugger(openrouter_api_key)
+        # Initialize qwen debugger
+        self.debugger = qwenDebugger(openrouter_api_key)
         
     def generate_parser_code(self, pdf_content: str) -> str:
         """Generate PDF parser code with Gemini"""
@@ -340,11 +340,11 @@ class SimplePDFParserGenerator:
         """
         
         try:
-            logger.info("🤖 Generating parser code with Gemini...")
+            logger.info(" Generating parser code with Gemini...")
             response = self.model.generate_content(prompt)
             generated_code = response.text
             
-            logger.info(f"📝 Gemini returned {len(generated_code)} characters")
+            logger.info(f" Gemini returned {len(generated_code)} characters")
             
             # Use the same extraction and validation logic
             validated_code = self.debugger.extract_and_validate_code(generated_code)
@@ -352,18 +352,18 @@ class SimplePDFParserGenerator:
             # Ensure parse() function exists
             validated_code = self.ensure_parse_function(validated_code)
             
-            logger.info("✅ Gemini code generation completed successfully")
+            logger.info(" Gemini code generation completed successfully")
             return validated_code
             
         except Exception as e:
-            logger.error(f"❌ Gemini code generation failed: {e}")
+            logger.error(f" Gemini code generation failed: {e}")
             raise
     
     def ensure_parse_function(self, code: str) -> str:
         """Ensure the code has a top-level parse(pdf_path) -> pd.DataFrame function"""
         
         if "def parse(pdf_path)" in code:
-            logger.info("✅ parse() function already exists")
+            logger.info(" parse() function already exists")
             return code
         
         logger.info("🔧 Adding parse() function wrapper")
@@ -429,7 +429,7 @@ def parse(pdf_path):
                 raise Exception(f"File {filename} is empty")
             
             if file_size < len(code.encode('utf-8')) * 0.9:  # Allow for encoding differences
-                logger.warning(f"⚠️ File size ({file_size}) much smaller than expected ({len(code)})")
+                logger.warning(f" File size ({file_size}) much smaller than expected ({len(code)})")
             
             # Validate file content (fix encoding)
             with open(filename, 'r', encoding='utf-8') as f:
@@ -438,11 +438,11 @@ def parse(pdf_path):
             if len(saved_content) < len(code) * 0.9:
                 raise Exception(f"Saved file content is truncated. Expected ~{len(code)}, got {len(saved_content)}")
             
-            logger.info(f"✅ Successfully saved {file_size} bytes to {filename}")
+            logger.info(f" Successfully saved {file_size} bytes to {filename}")
             return filename
             
         except Exception as e:
-            logger.error(f"❌ Failed to save code to {filename}: {e}")
+            logger.error(f" Failed to save code to {filename}: {e}")
             raise
     
     def test_code(self, code: str, pdf_path: str, target_csv: str = None) -> Dict[str, Any]:
@@ -463,23 +463,23 @@ def parse(pdf_path):
             if os.path.exists(test_csv):
                 os.unlink(test_csv)
             
-            logger.info(f"🧪 Testing parser: {temp_script}")
-            logger.info(f"📄 Input PDF: {pdf_path}")
-            logger.info(f"📊 Output CSV: {test_csv}")
+            logger.info(f" Testing parser: {temp_script}")
+            logger.info(f" Input PDF: {pdf_path}")
+            logger.info(f"Output CSV: {test_csv}")
             
             cmd = [sys.executable, temp_script, pdf_path, test_csv]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             
-            logger.info(f"📋 Script return code: {result.returncode}")
-            logger.info(f"📋 Script stdout: {result.stdout}")
+            logger.info(f"Script return code: {result.returncode}")
+            logger.info(f"Script stdout: {result.stdout}")
             if result.stderr:
-                logger.warning(f"📋 Script stderr: {result.stderr}")
+                logger.warning(f"Script stderr: {result.stderr}")
             
             # Check if script ran without crashing AND created the CSV file
             if result.returncode == 0:
                 if os.path.exists(test_csv):
                     csv_size = os.path.getsize(test_csv)
-                    logger.info(f"✅ CSV created successfully: {csv_size} bytes")
+                    logger.info(f" CSV created successfully: {csv_size} bytes")
                     
                     if csv_size > 0:
                         # If target CSV provided, compare with it
@@ -509,7 +509,7 @@ def parse(pdf_path):
         except subprocess.TimeoutExpired:
             return {'success': False, 'error': "Code execution timed out (120s limit)"}
         except Exception as e:
-            logger.error(f"❌ Test execution failed: {e}")
+            logger.error(f" Test execution failed: {e}")
             return {'success': False, 'error': f"Execution exception: {str(e)}"}
         finally:
             # Cleanup
@@ -620,7 +620,7 @@ def parse(pdf_path):
                 reader = PyPDF2.PdfReader(file)
                 sample_text = ""
                 
-                logger.info(f"📄 PDF has {len(reader.pages)} pages")
+                logger.info(f" PDF has {len(reader.pages)} pages")
                 
                 for i, page in enumerate(reader.pages[:3]):  # Extract from first 3 pages
                     try:
@@ -631,7 +631,7 @@ def parse(pdf_path):
                     except Exception as e:
                         logger.warning(f"Could not extract from page {i+1}: {e}")
                 
-                logger.info(f"📝 Extracted {len(sample_text)} characters from PDF")
+                logger.info(f" Extracted {len(sample_text)} characters from PDF")
                 return sample_text[:5000]  # Return more content
                 
         except Exception as e:
@@ -702,19 +702,19 @@ if __name__ == "__main__":
             try:
                 # Step 1: Generate code with Gemini (only on first iteration)
                 if current_code is None:
-                    logger.info("🤖 Generating parser code with Gemini...")
+                    logger.info(" Generating parser code with Gemini...")
                     current_code = self.generate_parser_code(pdf_content)
                 
                 # Step 2: Test the code (now includes CSV comparison if target provided)
-                logger.info("🧪 Testing generated code...")
+                logger.info(" Testing generated code...")
                 test_result = self.test_code(current_code, pdf_path, target_csv)
                 
                 if test_result['success']:
-                    logger.info("✅ Code works and CSV matches target! Saving final version...")
+                    logger.info(" Code works and CSV matches target! Saving final version...")
                     break
                 else:
-                    # Code execution failed or CSV doesn't match - debug with DeepSeek
-                    logger.info("🐛 Code failed or CSV doesn't match, debugging with DeepSeek...")
+                    # Code execution failed or CSV doesn't match - debug with qwen
+                    logger.info("🐛 Code failed or CSV doesn't match, debugging with qwen...")
                     logger.info(f"Error: {test_result['error'][:500]}...")
                     
                     
@@ -731,11 +731,11 @@ if __name__ == "__main__":
                     # Ensure parse function after debugging
                     current_code = self.ensure_parse_function(current_code)
                     
-                    logger.info("🔧 DeepSeek debugging completed")
+                    logger.info("🔧 qwen debugging completed")
                     continue
                 
             except Exception as e:
-                logger.error(f"❌ Iteration {iteration} failed: {e}")
+                logger.error(f" Iteration {iteration} failed: {e}")
                 traceback.print_exc()
                 if iteration == max_iterations:
                     # If all iterations failed, return the last generated code anyway
@@ -752,7 +752,7 @@ if __name__ == "__main__":
         
         # T1: Enforce ≤3 attempts
         max_iterations = min(max_attempts, 3)
-        logger.info(f"🎯 T1: Using {max_iterations} attempts maximum")
+        logger.info(f" T1: Using {max_iterations} attempts maximum")
         
         # Generate working parser with target CSV comparison
         parser_code = self.create_working_parser(pdf_path, target_csv, max_iterations)
@@ -768,12 +768,12 @@ if __name__ == "__main__":
             
             parser_script_path = os.path.join("custom_parsers", f"{target}_parser.py")
             self.save_code_safely(parser_code, parser_script_path)
-            logger.info(f"✅ T2: Saved parser to {parser_script_path}")
+            logger.info(f" T2: Saved parser to {parser_script_path}")
             
             # T4: Create pytest file
             if target_csv:
                 test_file = self.create_test_file(target, pdf_path, target_csv)
-                logger.info(f"✅ T4: Created test file {test_file}")
+                logger.info(f" T4: Created test file {test_file}")
         else:
             # Fallback to timestamp naming if no target specified
             timestamp = int(pd.Timestamp.now().timestamp())
@@ -781,7 +781,7 @@ if __name__ == "__main__":
             self.save_code_safely(parser_code, parser_script_path)
         
         # Execute final parser
-        logger.info("🚀 Executing final parser...")
+        logger.info(" Executing final parser...")
         
         if output_csv is None:
             output_csv = pdf_path.replace('.pdf', '_parsed.csv')
@@ -791,34 +791,34 @@ if __name__ == "__main__":
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
             
-            logger.info(f"📋 Final execution return code: {result.returncode}")
-            logger.info(f"📋 Final execution stdout: {result.stdout}")
+            logger.info(f"Final execution return code: {result.returncode}")
+            logger.info(f"Final execution stdout: {result.stdout}")
             if result.stderr:
-                logger.warning(f"📋 Final execution stderr: {result.stderr}")
+                logger.warning(f"Final execution stderr: {result.stderr}")
             
             if result.returncode == 0:
-                logger.info("✅ Final execution successful!")
+                logger.info(" Final execution successful!")
                 print(result.stdout)
                 
                 # Check if output CSV was actually created
                 if os.path.exists(output_csv):
                     csv_size = os.path.getsize(output_csv)
-                    logger.info(f"✅ Final CSV created: {csv_size} bytes")
+                    logger.info(f" Final CSV created: {csv_size} bytes")
                     
                     # Final CSV comparison if target provided
                     if target_csv and csv_size > 0:
-                        logger.info("📊 Final CSV comparison...")
+                        logger.info("Final CSV comparison...")
                         final_comparison = self.compare_csvs(output_csv, target_csv)
                         
                         if final_comparison['has_differences']:
-                            logger.warning("⚠️ Final output still has differences from target")
+                            logger.warning(" Final output still has differences from target")
                             print(f"Differences: {final_comparison['differences']}")
                         else:
-                            logger.info("🎯 Perfect match with target CSV!")
+                            logger.info(" Perfect match with target CSV!")
                             
                         # T4: Run pytest if target specified
                         if target:
-                            logger.info("🧪 T4: Running pytest...")
+                            logger.info(" T4: Running pytest...")
                             try:
                                 pytest_result = subprocess.run(
                                     [sys.executable, "-m", "pytest", f"tests/test_{target}_parser.py", "-v"],
@@ -827,24 +827,24 @@ if __name__ == "__main__":
                                     timeout=60
                                 )
                                 if pytest_result.returncode == 0:
-                                    logger.info("✅ T4: Pytest passed!")
-                                    print("🧪 All tests passed!")
+                                    logger.info(" T4: Pytest passed!")
+                                    print(" All tests passed!")
                                 else:
-                                    logger.warning(f"⚠️ T4: Pytest failed: {pytest_result.stdout}\n{pytest_result.stderr}")
+                                    logger.warning(f" T4: Pytest failed: {pytest_result.stdout}\n{pytest_result.stderr}")
                             except Exception as e:
-                                logger.warning(f"⚠️ T4: Could not run pytest: {e}")
+                                logger.warning(f" T4: Could not run pytest: {e}")
                 else:
-                    logger.error("❌ Final CSV was not created!")
+                    logger.error(" Final CSV was not created!")
                 
                 return output_csv
             else:
-                logger.warning(f"⚠️ Final execution had issues: {result.stderr}")
+                logger.warning(f" Final execution had issues: {result.stderr}")
                 return output_csv
                 
         except subprocess.TimeoutExpired:
             raise Exception("Final execution timed out (5 minutes)")
         except Exception as e:
-            logger.error(f"❌ Final execution failed: {e}")
+            logger.error(f" Final execution failed: {e}")
             raise
 
 def parse_arguments():
@@ -888,7 +888,7 @@ def main():
     OPENROUTER_API_KEY = "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"
     
     if not GEMINI_API_KEY or not OPENROUTER_API_KEY:
-        print("❌ Please set both API keys")
+        print(" Please set both API keys")
         return
     
     # T2: Construct standard paths from --target
@@ -899,19 +899,19 @@ def main():
     
     # Validate paths exist
     if not os.path.exists(pdf_path):
-        print(f"❌ PDF not found: {pdf_path}")
+        print(f" PDF not found: {pdf_path}")
         return
     
     if not os.path.exists(target_csv):
-        print(f"❌ Target CSV not found: {target_csv}")
+        print(f" Target CSV not found: {target_csv}")
         return
     
     try:
-        logger.info(f"🚀 Starting T1-T4 Compliant PDF Parser Agent...")
-        logger.info(f"🎯 Target: {target}")
-        logger.info(f"📄 PDF: {pdf_path}")
-        logger.info(f"📊 Target CSV: {target_csv}")
-        logger.info(f"🔄 Max attempts: {max_iterations}")
+        logger.info(f" Starting T1-T4 Compliant PDF Parser Agent...")
+        logger.info(f" Target: {target}")
+        logger.info(f" PDF: {pdf_path}")
+        logger.info(f"Target CSV: {target_csv}")
+        logger.info(f"Max attempts: {max_iterations}")
         
         # Initialize generator
         generator = SimplePDFParserGenerator(GEMINI_API_KEY, OPENROUTER_API_KEY)
@@ -925,32 +925,32 @@ def main():
             max_attempts=max_iterations
         )
         
-        print(f"\n✅ Successfully parsed PDF with T1-T4 compliance!")
-        print(f"📄 Input PDF: {pdf_path}")
-        print(f"📊 Output CSV: {result_csv}")
-        print(f"🧬 Parser saved: custom_parsers/{target}_parser.py")
-        print(f"🧪 Test file: tests/test_{target}_parser.py")
+        print(f"\n Successfully parsed PDF with T1-T4 compliance!")
+        print(f" Input PDF: {pdf_path}")
+        print(f"Output CSV: {result_csv}")
+        print(f"Parser saved: custom_parsers/{target}_parser.py")
+        print(f" Test file: tests/test_{target}_parser.py")
         
         # Preview results
         try:
             if os.path.exists(result_csv) and os.path.getsize(result_csv) > 0:
                 df = pd.read_csv(result_csv)
-                print(f"\n📈 Preview ({len(df)} rows, {len(df.columns)} columns):")
+                print(f"\n Preview ({len(df)} rows, {len(df.columns)} columns):")
                 print(df.head().to_string(index=False))
             else:
-                print(f"\n⚠️ Output CSV is empty or doesn't exist")
+                print(f"\n Output CSV is empty or doesn't exist")
         except Exception as e:
             print(f"Could not preview: {e}")
         
         # Final validation message
-        print(f"\n🎯 T1-T4 Compliance Summary:")
-        print(f"✅ T1: Used ≤3 attempts ({max_iterations})")
-        print(f"✅ T2: CLI `python agent.py --target {target}` reads standard paths")
-        print(f"✅ T3: Generated parser has parse(pdf_path) -> DataFrame")
-        print(f"✅ T4: Created pytest with DataFrame.equals test")
+        print(f"\n T1-T4 Compliance Summary:")
+        print(f" T1: Used ≤3 attempts ({max_iterations})")
+        print(f" T2: CLI `python agent.py --target {target}` reads standard paths")
+        print(f" T3: Generated parser has parse(pdf_path) -> DataFrame")
+        print(f" T4: Created pytest with DataFrame.equals test")
             
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f" Error: {e}")
         traceback.print_exc()
 
 if __name__ == "__main__":
