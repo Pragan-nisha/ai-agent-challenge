@@ -27,7 +27,7 @@ It follows a closed loop: generate → run → debug → retry (≤3 iterations)
 3. **Run the agent on a target dataset**
 
    ```bash
-   python try.py --target icici
+   python agent.py --target icici --attempts 3
    ```
 
    This will:
