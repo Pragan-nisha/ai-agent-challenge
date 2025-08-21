@@ -23,8 +23,15 @@ It follows a closed loop: generate → run → debug → retry (≤3 iterations)
    pip install -r requirements.txt
    ```
 
+3.**Set your API keys in .env**
+```
+Create a file named .env in the project root:
 
-3. **Run the agent on a target dataset**
+GEMINI_API_KEY=your_gemini_api_key_here
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+```
+
+4. **Run the agent on a target dataset**
 
    ```bash
    python agent.py --target icici --attempts 3
@@ -36,8 +43,7 @@ It follows a closed loop: generate → run → debug → retry (≤3 iterations)
    * Generate a parser under `custom_parsers/icici_parser.py`
    * Create a test at `tests/test_icici_parser.py`
    * Run pytest to validate the parser
-
-4. **Check results**
+5. **Check results**
    If successful, you’ll see ✅ pytest passing.
    The parsed output is returned as a Pandas DataFrame.
 
@@ -78,11 +84,12 @@ The agent follows a **closed feedback loop**:
 ├── data/                        # Contains PDF + CSV samples per target
 ├── requirements.txt
 └── README.md
+|__ .env
 ```
 
 ---
 
-## ⚠️ Notes & Limitations
+## Notes & Limitations
 
 * The agent depends on **external APIs** (Gemini + OpenRouter).
 * After 3 failed attempts, the agent will return the **last candidate parser** for inspection.
